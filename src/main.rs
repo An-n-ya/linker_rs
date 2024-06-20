@@ -1,5 +1,6 @@
 mod e_header;
 mod linker;
+mod section_header;
 mod utils;
 use std::{env::args, fs::File};
 
@@ -27,4 +28,6 @@ fn main() {
         args[1],
         input_file.elf_sections.len()
     );
+
+    print!("{}", input_file);
 }
