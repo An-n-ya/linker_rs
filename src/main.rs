@@ -1,3 +1,4 @@
+mod e_header;
 mod linker;
 mod utils;
 use std::{env::args, fs::File};
@@ -21,6 +22,9 @@ fn main() {
 
     let input_file = InputFile::new(file);
 
-    println!("{}", input_file.elf_sections.len());
-
+    println!(
+        "section number of {} is {}",
+        args[1],
+        input_file.elf_sections.len()
+    );
 }

@@ -1,4 +1,7 @@
-use std::{io::{self, Read}, slice};
+use std::{
+    io::{self, Read},
+    slice,
+};
 
 pub fn read_struct<T, R: Read>(read: &mut R) -> io::Result<T> {
     let num_bytes = ::std::mem::size_of::<T>();

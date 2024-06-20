@@ -1,4 +1,7 @@
-use std::{fs::File, io::{Cursor, Read}};
+use std::{
+    fs::File,
+    io::{Cursor, Read},
+};
 
 use crate::linker::{ElfHeader, SectionHeader};
 
@@ -7,7 +10,7 @@ use super::read_struct::read_struct;
 pub struct InputFile {
     #[allow(dead_code)]
     file: File,
-    pub elf_sections: Vec<SectionHeader>
+    pub elf_sections: Vec<SectionHeader>,
 }
 
 impl InputFile {
@@ -16,6 +19,7 @@ impl InputFile {
         file.read_to_end(&mut contents).unwrap();
         let mut cursor = Cursor::new(contents);
         let elf_header: ElfHeader = read_struct(&mut cursor).ok().unwrap();
+        println!("{}", elf_header);
         let section_offset = elf_header.sh_off;
         let mut section_num = elf_header.sh_num as u64;
 
@@ -34,7 +38,7 @@ impl InputFile {
 
         Self {
             file,
-            elf_sections: sections
+            elf_sections: sections,
         }
     }
 }
