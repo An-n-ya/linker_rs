@@ -2,6 +2,7 @@ TESTS := $(wildcard tests/*.sh)
 
 build:
 	cargo build
+	@ln -sf target/debug/linker_rs ld
 
 test: build
 	$(MAKE) $(TESTS)

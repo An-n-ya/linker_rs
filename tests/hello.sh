@@ -15,4 +15,5 @@ int mian(void) {
 EOF
 
 
-target/debug/linker_rs "$t"/a.o
+# target/debug/linker_rs "$t"/a.o
+gcc -B. -fno-lto -static "$t"/a.o -o "$t"/out
