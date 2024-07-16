@@ -1,3 +1,4 @@
+mod archive_parser;
 mod argument_parser;
 mod e_header;
 mod linker;
@@ -8,14 +9,32 @@ use std::{env::args, fs::File};
 use argument_parser::Args;
 use clap::Parser;
 
-use crate::utils::input_file::InputFile;
+use crate::utils::input_file::ElfData;
 
 fn main() {
     let args = Args::parse();
     // let args: Vec<String> = args().collect();
-    dbg!(&args);
+    // dbg!(&args);
+    let archive_parser = archive_parser::Parser::new(args.library_path);
+
+    let mut elf_data = vec![];
+    if let Some(library) = args.library {
+        for archive in library {
+            let mut elf = archive_parser.parse(archive);
+            elf_data.append(&mut elf);
+        }
+    }
+
+    let elf_size = elf_data.len();
+    dbg!(elf_size);
+    for i in 1..10 {
+        let name = &elf_data[elf_size - i].name;
+        dbg!(name);
+    }
 
     return;
+
+    // TODO: check every input file is relocatable elf
 
     // dbg!(&args);
 

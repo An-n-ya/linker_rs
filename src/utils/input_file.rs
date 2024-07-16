@@ -11,19 +11,22 @@ use crate::{
 
 use super::{read_struct::read_struct, str_table::StrTable};
 
-pub struct InputFile {
-    #[allow(dead_code)]
-    file: File,
+pub struct ElfData {
+    pub name: String,
     pub elf_header: ElfHeader,
     pub elf_sections: Vec<SectionHeader>,
     sec_str_tab: StrTable,
 }
 
-impl InputFile {
-    pub fn new(mut file: File) -> Self {
+impl ElfData {
+    pub fn new(mut file: File, name: String) -> Self {
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
-        let mut cursor = Cursor::new(contents);
+        Self::new_from_buf(&contents, name)
+    }
+
+    pub fn new_from_buf(data: &[u8], name: String) -> Self {
+        let mut cursor = Cursor::new(data);
         let elf_header: ElfHeader = read_struct(&mut cursor).ok().unwrap();
         let section_offset = elf_header.sh_off;
         let mut section_num = elf_header.sh_num as u64;
@@ -54,7 +57,7 @@ impl InputFile {
         let table = StrTable::new(buf, size as usize);
 
         Self {
-            file,
+            name,
             elf_header,
             elf_sections: sections,
             sec_str_tab: table,
@@ -62,7 +65,7 @@ impl InputFile {
     }
 }
 
-impl fmt::Display for InputFile {
+impl fmt::Display for ElfData {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         println!("ELF Headers:");
         println!("{}", self.elf_header);
