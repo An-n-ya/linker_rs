@@ -1,15 +1,15 @@
 mod archive_parser;
 mod argument_parser;
+mod context;
 mod e_header;
 mod linker;
-mod section_header;
 mod utils;
 use std::{env::args, fs::File};
 
 use argument_parser::Args;
 use clap::Parser;
-
-use crate::utils::input_file::ElfData;
+use context::Context;
+use utils::input_file::ElfData;
 
 fn main() {
     let args = Args::parse();
@@ -17,20 +17,31 @@ fn main() {
     // dbg!(&args);
     let archive_parser = archive_parser::Parser::new(args.library_path);
 
-    let mut elf_data = vec![];
+    let mut ctx = Context::new();
+
     if let Some(library) = args.library {
         for archive in library {
-            let mut elf = archive_parser.parse(archive);
-            elf_data.append(&mut elf);
+            let elf = archive_parser.parse(archive);
+            for obj in elf {
+                ctx.push(obj);
+            }
         }
     }
 
-    let elf_size = elf_data.len();
-    dbg!(elf_size);
-    for i in 1..10 {
-        let name = &elf_data[elf_size - i].name;
-        dbg!(name);
+    for obj_path in args.objects {
+        let f = File::open(&obj_path).expect(&format!("cannot open file {:?}", &obj_path));
+        let elf = ElfData::new(
+            f,
+            obj_path.file_name().unwrap().to_str().unwrap().to_string(),
+        );
+        if elf.name == "a.o" {
+            println!("name: {} \n {elf}", elf.name);
+        }
+        ctx.push(elf);
     }
+
+    let elf_size = ctx.obj_size();
+    dbg!(elf_size);
 
     return;
 

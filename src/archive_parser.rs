@@ -125,7 +125,8 @@ impl Parser {
                 let size = data.len();
                 string_table = Some(StrTable::new(data, size));
             } else {
-                let elf = ElfData::new_from_buf(&data, archive_entry.get_name(&string_table));
+                let elf: ElfData =
+                    ElfData::new_from_buf(&data, archive_entry.get_name(&string_table));
                 elf_data.push(elf);
             }
         }

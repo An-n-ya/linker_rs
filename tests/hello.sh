@@ -8,7 +8,7 @@ mkdir -p "$t"
 cat <<EOF | gcc -o "$t"/a.o -c -xc -
 #include <stdio.h>
 
-int mian(void) {
+int main(void) {
     printf("hello world\n");
     return 0;
 }
