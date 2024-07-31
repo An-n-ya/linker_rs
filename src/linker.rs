@@ -52,7 +52,7 @@ pub struct ElfSymbol {
 
 #[repr(u32)]
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, unused)]
 pub enum SectionType {
     DYNAMIC = 0x6,
     DYNSYM = 0xb,

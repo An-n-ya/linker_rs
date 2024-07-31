@@ -3,8 +3,10 @@ mod argument_parser;
 mod context;
 mod e_header;
 mod linker;
+mod passes;
+mod symbol;
 mod utils;
-use std::{env::args, fs::File};
+use std::fs::File;
 
 use argument_parser::Args;
 use clap::Parser;
@@ -30,10 +32,11 @@ fn main() {
 
     for obj_path in args.objects {
         let f = File::open(&obj_path).expect(&format!("cannot open file {:?}", &obj_path));
-        let elf = ElfData::new(
+        let mut elf = ElfData::new(
             f,
             obj_path.file_name().unwrap().to_str().unwrap().to_string(),
         );
+        elf.is_alive = true;
         if elf.name == "a.o" {
             println!("name: {} \n {elf}", elf.name);
         }
@@ -42,6 +45,24 @@ fn main() {
 
     let elf_size = ctx.obj_size();
     dbg!(elf_size);
+
+    ctx.resolve_symbol();
+
+    for elf in ctx.object_iter() {
+        let elf = elf.lock().unwrap();
+        if elf.name == "a.o" {
+            if let Some(info) = &elf.symbol_info {
+                for sym in &info.global_symbols {
+                    let sym = sym.lock().unwrap();
+                    if sym.name == "puts" {
+                        let target_elf = ctx.get_object(sym.elf.unwrap()).unwrap();
+                        let target_elf = target_elf.lock().unwrap();
+                        println!("puts method is in {}", target_elf.name);
+                    }
+                }
+            }
+        }
+    }
 
     return;
 
