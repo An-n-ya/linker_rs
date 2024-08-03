@@ -5,7 +5,7 @@ use std::{
     str::from_utf8_unchecked,
 };
 
-use crate::utils::{input_file::ElfData, read_struct::read_struct, str_table::StrTable};
+use crate::utils::{input_elf::InputElf, read_struct::read_struct, str_table::StrTable};
 
 pub struct Parser {
     libraries: Option<Vec<PathBuf>>,
@@ -72,7 +72,7 @@ impl Parser {
         Self { libraries }
     }
 
-    pub fn parse(&self, archive: String) -> Vec<ElfData> {
+    pub fn parse(&self, archive: String) -> Vec<InputElf> {
         if let Some(libraries) = &self.libraries {
             for path in libraries {
                 let archive = format!("lib{}.a", archive);
@@ -89,7 +89,7 @@ impl Parser {
         }
     }
 
-    fn parse_inner(mut file: File) -> Vec<ElfData> {
+    fn parse_inner(mut file: File) -> Vec<InputElf> {
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
         let total = contents.len() as u64;
@@ -125,8 +125,8 @@ impl Parser {
                 let size = data.len();
                 string_table = Some(StrTable::new(data, size));
             } else {
-                let elf: ElfData =
-                    ElfData::new_from_buf(&data, archive_entry.get_name(&string_table));
+                let elf: InputElf =
+                    InputElf::new_from_buf(&data, archive_entry.get_name(&string_table));
                 elf_data.push(elf);
             }
         }

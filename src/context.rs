@@ -6,11 +6,11 @@ use std::{
 
 use crate::{
     symbol::{ShareSymbol, Symbol},
-    utils::input_file::ElfData,
+    utils::input_elf::InputElf,
 };
 
 pub struct Context {
-    objects: HashMap<usize, Rc<Mutex<ElfData>>>,
+    objects: HashMap<usize, Rc<Mutex<InputElf>>>,
     symbol_map: HashMap<String, ShareSymbol>,
     obj_id: usize,
 }
@@ -23,7 +23,7 @@ impl Context {
             obj_id: 1,
         }
     }
-    pub fn push(&mut self, mut object: ElfData) {
+    pub fn push(&mut self, mut object: InputElf) {
         object.id = self.obj_id;
         object.initialize_symbol(self);
         self.objects
@@ -33,10 +33,10 @@ impl Context {
     pub fn obj_size(&self) -> usize {
         self.objects.len()
     }
-    pub fn object_iter(&self) -> Values<'_, usize, Rc<Mutex<ElfData>>> {
+    pub fn object_iter(&self) -> Values<'_, usize, Rc<Mutex<InputElf>>> {
         self.objects.values()
     }
-    pub fn get_object(&self, id: usize) -> Option<Rc<Mutex<ElfData>>> {
+    pub fn get_object(&self, id: usize) -> Option<Rc<Mutex<InputElf>>> {
         self.objects.get(&id).map(|n| n.clone())
     }
     pub fn reclaim_objects(&mut self) {

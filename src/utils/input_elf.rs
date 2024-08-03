@@ -14,7 +14,7 @@ use crate::{
 
 use super::{read_struct::read_struct, str_table::StrTable};
 
-pub struct ElfData {
+pub struct InputElf {
     pub name: String,
     pub elf_header: ElfHeader,
     pub elf_sections: Vec<SectionHeader>,
@@ -32,7 +32,7 @@ pub struct SymbolInfo {
     pub global_symbols: Vec<ShareSymbol>,
 }
 
-impl ElfData {
+impl InputElf {
     pub fn new(mut file: File, name: String) -> Self {
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
@@ -188,7 +188,7 @@ impl ElfData {
 
     pub fn mark_live_objects<F>(&self, ctx: &Context, mut f: F)
     where
-        F: FnMut(Rc<Mutex<ElfData>>),
+        F: FnMut(Rc<Mutex<InputElf>>),
     {
         assert!(self.is_alive);
 
@@ -218,7 +218,7 @@ impl ElfData {
     }
 }
 
-impl fmt::Display for ElfData {
+impl fmt::Display for InputElf {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         println!("ELF Headers:");
         println!("{}", self.elf_header);

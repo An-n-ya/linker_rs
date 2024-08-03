@@ -11,7 +11,7 @@ use std::fs::File;
 use argument_parser::Args;
 use clap::Parser;
 use context::Context;
-use utils::input_file::ElfData;
+use utils::input_elf::InputElf;
 
 fn main() {
     let args = Args::parse();
@@ -32,7 +32,7 @@ fn main() {
 
     for obj_path in args.objects {
         let f = File::open(&obj_path).expect(&format!("cannot open file {:?}", &obj_path));
-        let mut elf = ElfData::new(
+        let mut elf = InputElf::new(
             f,
             obj_path.file_name().unwrap().to_str().unwrap().to_string(),
         );
