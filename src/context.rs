@@ -26,6 +26,7 @@ impl Context {
     pub fn push(&mut self, mut object: InputElf) {
         object.id = self.obj_id;
         object.initialize_symbol(self);
+        object.initialize_section();
         self.objects
             .insert(self.obj_id, Rc::new(Mutex::new(object)));
         self.obj_id += 1;

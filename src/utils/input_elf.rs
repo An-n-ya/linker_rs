@@ -9,6 +9,7 @@ use std::{
 use crate::{
     context::Context,
     linker::{ElfHeader, ElfSymbol, SectionHeader, SectionIndex, SectionType},
+    section::Section,
     symbol::{ShareSymbol, Symbol},
 };
 
@@ -17,11 +18,16 @@ use super::{read_struct::read_struct, str_table::StrTable};
 pub struct InputElf {
     pub name: String,
     pub elf_header: ElfHeader,
-    pub elf_sections: Vec<SectionHeader>,
+    pub section_info: SectionInfo,
     pub symbol_info: Option<SymbolInfo>,
     pub is_alive: bool,
     pub id: usize,
-    sec_str_tab: StrTable,
+}
+
+pub struct SectionInfo {
+    pub elf_sections: Vec<SectionHeader>,
+    pub str_tab: StrTable,
+    pub sections: Vec<Option<Section>>,
 }
 
 pub struct SymbolInfo {
@@ -102,24 +108,56 @@ impl InputElf {
             }
             symbol_info = Some(info);
         }
+        let mut section_info = SectionInfo {
+            elf_sections: sections,
+            sections: vec![],
+            str_tab: table,
+        };
+        for (i, sec) in section_info.elf_sections.iter().enumerate() {
+            use SectionType::*;
+            match sec._type {
+                SYMTAB | REL | RELA | STRTAB | NULL => {
+                    section_info.sections.push(None);
+                }
+                _ => {
+                    let name = section_info.str_tab.get(sec.name as usize);
+                    let data = read_section_data(&mut cursor, sec);
+                    let section = Section {
+                        elf: 0, // this is a temporary id
+                        name,
+                        index: i,
+                        data,
+                    };
+
+                    section_info.sections.push(Some(section));
+                }
+            }
+        }
 
         Self {
             name,
             elf_header,
             is_alive: false,
             symbol_info,
-            elf_sections: sections,
-            sec_str_tab: table,
+            section_info,
             id: 0,
         }
     }
     pub fn find_section(&self, typ: SectionType) -> Option<SectionHeader> {
-        for s in &self.elf_sections {
+        for s in &self.section_info.elf_sections {
             if s._type == typ {
                 return Some(s.clone());
             }
         }
         None
+    }
+
+    pub fn initialize_section(&mut self) {
+        for sec in self.section_info.sections.iter_mut() {
+            if let Some(sec) = sec {
+                sec.elf = self.id;
+            }
+        }
     }
 
     pub fn initialize_symbol(&mut self, ctx: &mut Context) {
@@ -223,18 +261,18 @@ impl fmt::Display for InputElf {
         println!("ELF Headers:");
         println!("{}", self.elf_header);
 
-        println!("str table: {:?}", self.sec_str_tab);
+        println!("str table: {:?}", self.section_info.str_tab);
 
         println!("\nSection Headers:");
         println!("[Nr] Name\t\tType\t\tAddr\t\tOffset\t\tSize\t\tES\tFlg\tLk\tInf\tAl");
-        for (i, sec) in self.elf_sections.iter().enumerate() {
-            let mut name = self.sec_str_tab.get(sec.name as usize);
+        for (i, sec) in self.section_info.elf_sections.iter().enumerate() {
+            let mut name = self.section_info.str_tab.get(sec.name as usize);
             name.truncate(10);
             if name.len() == 10 {
                 name.push_str("..");
             }
             println!(
-                "[{i:02}] {:<12}\t{:?}\t{:08x}\t{:08x}\t{:08x}\t{}\t{}\t{}\t{}\t{}",
+                "[{i:02}] {:<12}\t{:?}\t{:08x}\t{:08x}\t{:08x}\t{}\t{:?}\t{}\t{}\t{}",
                 name,
                 sec._type,
                 sec.addr,

@@ -74,6 +74,26 @@ pub enum SectionType {
     STRTAB = 0x3,
     SYMTAB = 0x2,
 }
+#[repr(u64)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(non_camel_case_types, unused)]
+pub enum SectionFlag {
+    WRITE = (1 << 0),            /* Writable */
+    ALLOC = (1 << 1),            /* Occupies memory during execution */
+    EXECINSTR = (1 << 2),        /* Executable */
+    MERGE = (1 << 4),            /* Might be merged */
+    STRINGS = (1 << 5),          /* Contains nul-terminated strings */
+    INFO_LINK = (1 << 6),        /* `sh_info' contains SHT index */
+    LINK_ORDER = (1 << 7),       /* Preserve order after combining */
+    OS_NONCONFORMING = (1 << 8), /* Non-standard OS specific handling required */
+    GROUP = (1 << 9),            /* Section is member of a group.  */
+    TLS = (1 << 10),             /* Section hold thread-local data.  */
+    COMPRESSED = (1 << 11),      /* Section with compressed data. */
+    MASKOS = 0x0ff00000,         /* OS-specific.  */
+    MASKPROC = 0xf0000000,       /* Processor-specific */
+    ORDERED = (1 << 30),         /* Special ordering requirement (Solaris).  */
+    EXCLUDE = (1 << 31),         /* Section is excluded unless referenced or allocated (Solaris).*/
+}
 
 #[repr(u16)]
 #[derive(PartialEq, Eq, Clone)]
@@ -146,6 +166,12 @@ impl ElfSymbol {
     pub fn bind(&self) -> SymbolBinding {
         let bind = self.info >> 0x4;
         SymbolBinding::from(bind)
+    }
+    pub fn is_abs(&self) -> bool {
+        self.index() == SectionIndex::ABS
+    }
+    pub fn is_common(&self) -> bool {
+        self.index() == SectionIndex::COMMON
     }
 }
 

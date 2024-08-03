@@ -4,6 +4,7 @@ mod context;
 mod e_header;
 mod linker;
 mod passes;
+mod section;
 mod symbol;
 mod utils;
 use std::fs::File;
