@@ -25,7 +25,7 @@ pub struct ElfHeader {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SectionHeader {
     pub name: u32,
     pub _type: SectionType,
@@ -51,7 +51,7 @@ pub struct ElfSymbol {
 }
 
 #[repr(u32)]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(non_camel_case_types, unused)]
 pub enum SectionType {
     DYNAMIC = 0x6,
@@ -73,6 +73,11 @@ pub enum SectionType {
     SHLIB = 0xa,
     STRTAB = 0x3,
     SYMTAB = 0x2,
+}
+impl Default for SectionType {
+    fn default() -> Self {
+        Self::NULL
+    }
 }
 #[repr(u64)]
 #[derive(Debug, PartialEq, Eq, Clone)]

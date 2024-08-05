@@ -5,14 +5,22 @@ use std::{
 };
 
 use crate::{
+    linker::SectionType,
+    output_section::{
+        merged_section::MergedSection,
+        output_section::{SectionWrapper, ShareOutputSection},
+    },
     symbol::{ShareSymbol, Symbol},
     utils::input_elf::InputElf,
+    Id,
 };
 
 pub struct Context {
     objects: HashMap<usize, Rc<Mutex<InputElf>>>,
     symbol_map: HashMap<String, ShareSymbol>,
+    pub sections: HashMap<usize, ShareOutputSection>,
     obj_id: usize,
+    sec_id: usize,
 }
 
 impl Context {
@@ -20,13 +28,16 @@ impl Context {
         Self {
             objects: HashMap::default(),
             symbol_map: HashMap::default(),
+            sections: HashMap::default(),
             obj_id: 1,
+            sec_id: 1,
         }
     }
+
     pub fn push(&mut self, mut object: InputElf) {
         object.id = self.obj_id;
         object.initialize_symbol(self);
-        object.initialize_section();
+        object.initialize_section(self);
         self.objects
             .insert(self.obj_id, Rc::new(Mutex::new(object)));
         self.obj_id += 1;
@@ -80,5 +91,24 @@ impl Context {
             self.symbol_map.insert(name, sym.clone());
             sym
         }
+    }
+    pub fn find_mergeable_section(
+        &mut self,
+        name: String,
+        typ: SectionType,
+        flags: u64,
+    ) -> ShareOutputSection {
+        for sec in self.sections.values() {
+            let sec_guard = sec.lock().unwrap();
+            if name == sec_guard.name() && typ == sec_guard.typ() && flags == sec_guard.flags() {
+                return sec.clone();
+            }
+        }
+        let id = self.sec_id;
+        self.sec_id += 1;
+        let sec = SectionWrapper::new(id);
+        let sec = MergedSection::new(sec);
+        self.sections.insert(id, sec.clone());
+        sec
     }
 }

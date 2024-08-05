@@ -152,12 +152,22 @@ impl InputElf {
         None
     }
 
-    pub fn initialize_section(&mut self) {
+    fn initialize_mergeable_section(&mut self, ctx: &mut Context) {
+        // TODO: split mergeable section
+        // pollute ctx's merged section
+
+        // iterate over all mergeable section
+        // - for each elf object, pollute ctx's merged section
+        // - for each elf object, pollute each sym's section fragment (update offset etc.)
+    }
+
+    pub fn initialize_section(&mut self, ctx: &mut Context) {
         for sec in self.section_info.sections.iter_mut() {
             if let Some(sec) = sec {
                 sec.elf = self.id;
             }
         }
+        self.initialize_mergeable_section(ctx);
     }
 
     pub fn initialize_symbol(&mut self, ctx: &mut Context) {
