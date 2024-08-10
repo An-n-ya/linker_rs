@@ -3,6 +3,7 @@ use std::{rc::Rc, sync::Mutex};
 use crate::{context::Context, linker::SectionFlag};
 
 pub type ShareSection = Rc<Mutex<Section>>;
+#[derive(Debug)]
 pub struct Section {
     pub elf: usize,
     pub name: String,

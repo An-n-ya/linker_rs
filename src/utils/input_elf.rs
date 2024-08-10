@@ -3,14 +3,19 @@ use std::{
     fs::File,
     io::{Cursor, Read, Write},
     rc::Rc,
+    str::from_utf8,
     sync::Mutex,
 };
 
 use crate::{
     context::Context,
-    linker::{ElfHeader, ElfSymbol, SectionHeader, SectionIndex, SectionType},
+    linker::{ElfHeader, ElfSymbol, SectionFlag, SectionHeader, SectionIndex, SectionType},
+    output_section::{
+        merged_section::{FragmentData, ShareSectionFragment},
+        output_section::ShareOutputSection,
+    },
     section::Section,
-    symbol::{ShareSymbol, Symbol},
+    symbol::{self, ShareSymbol, Symbol},
 };
 
 use super::{read_struct::read_struct, str_table::StrTable};
@@ -28,6 +33,34 @@ pub struct SectionInfo {
     pub elf_sections: Vec<SectionHeader>,
     pub str_tab: StrTable,
     pub sections: Vec<Option<Section>>,
+    pub mergeable_sections: Vec<Option<InputMergeableSection>>,
+}
+
+struct InputMergeableSection {
+    pub parent: ShareOutputSection,
+    pub fragments: Vec<ShareSectionFragment>,
+    pub data: Vec<FragmentData>,
+    pub offset: Vec<usize>,
+}
+impl InputMergeableSection {
+    pub fn new(parent: ShareOutputSection) -> Self {
+        Self {
+            parent,
+            fragments: vec![],
+            data: vec![],
+            offset: vec![],
+        }
+    }
+    pub fn get_fragment(&self, offset: usize) -> ShareSectionFragment {
+        let mut ind = 0;
+        for (i, o) in self.offset.iter().enumerate() {
+            if *o >= offset {
+                ind = i;
+                break;
+            }
+        }
+        self.fragments[ind].clone()
+    }
 }
 
 pub struct SymbolInfo {
@@ -37,6 +70,8 @@ pub struct SymbolInfo {
     pub local_symbols: Vec<Symbol>,
     pub global_symbols: Vec<ShareSymbol>,
 }
+
+impl SymbolInfo {}
 
 impl InputElf {
     pub fn new(mut file: File, name: String) -> Self {
@@ -111,6 +146,7 @@ impl InputElf {
         let mut section_info = SectionInfo {
             elf_sections: sections,
             sections: vec![],
+            mergeable_sections: vec![],
             str_tab: table,
         };
         for (i, sec) in section_info.elf_sections.iter().enumerate() {
@@ -153,8 +189,67 @@ impl InputElf {
     }
 
     fn initialize_mergeable_section(&mut self, ctx: &mut Context) {
-        // TODO: split mergeable section
-        // pollute ctx's merged section
+        let total = self.section_info.elf_sections.len();
+        for i in 0..total {
+            let elf_sec = &self.section_info.elf_sections[i];
+            if (elf_sec.flags & SectionFlag::MERGE as u64) != 0 {
+                if let Some(ref sec) = &self.section_info.sections[i] {
+                    let name = sec.name.clone();
+                    let typ = elf_sec._type;
+                    let flags = elf_sec.flags;
+                    let out_sec = ctx.find_mergeable_section(name, typ, flags);
+                    let mut mergeable_section = InputMergeableSection::new(out_sec.clone());
+                    let out_sec_guard = out_sec.lock().unwrap();
+                    assert!(out_sec_guard.is_mergeable());
+
+                    if (elf_sec.flags & SectionFlag::STRINGS as u64) != 0 {
+                        let mut s_data: Vec<u8> = vec![];
+                        // let mut strings = vec![];
+                        let mut offset = 0;
+                        let size = elf_sec.ent_size as usize;
+                        for chunk in sec.data.chunks(size) {
+                            if chunk.iter().all(|&x| x == 0) {
+                                // FIXME: need to handle empty string
+                                let s = {
+                                    // FIXME: how to handle utf8
+                                    if let Ok(s) = from_utf8(&s_data) {
+                                        s.to_string()
+                                    } else {
+                                        let s: String = s_data.iter().map(|&c| c as char).collect();
+                                        s
+                                    }
+                                };
+                                // strings.push(s.clone());
+                                s_data.clear();
+                                mergeable_section.data.push(FragmentData::Str(s));
+                                mergeable_section.offset.push(offset);
+                            } else {
+                                s_data.extend(chunk);
+                            }
+                            offset += size;
+                        }
+                    } else {
+                        // constants
+                        let mut offset = 0;
+                        let size = elf_sec.ent_size as usize;
+                        for chunk in sec.data.chunks(size) {
+                            mergeable_section
+                                .data
+                                .push(FragmentData::Constant(Vec::from(chunk)));
+                            mergeable_section.offset.push(offset);
+                            offset += size;
+                        }
+                    }
+                    self.section_info
+                        .mergeable_sections
+                        .push(Some(mergeable_section));
+                } else {
+                    panic!("mergeable section doesn't exist");
+                }
+            } else {
+                self.section_info.mergeable_sections.push(None);
+            }
+        }
 
         // iterate over all mergeable section
         // - for each elf object, pollute ctx's merged section
@@ -168,6 +263,77 @@ impl InputElf {
             }
         }
         self.initialize_mergeable_section(ctx);
+
+        // register symbol to output mergeable section
+        self.register_mergeable_section();
+    }
+
+    fn register_mergeable_section(&mut self) {
+        let n = self.section_info.elf_sections.len();
+        for i in 0..n {
+            let elf = &self.section_info.elf_sections[i];
+            let sec = &mut self.section_info.mergeable_sections[i];
+            if let Some(sec) = sec {
+                let mut parent = sec.parent.lock().unwrap();
+                assert!(parent.is_mergeable());
+                if let Some(merge) = parent.to_mergeable() {
+                    for frag in &sec.data {
+                        // FIXME: is it right to use the ent_size?
+                        let sec_frag = merge.insert(frag, elf.ent_size as usize);
+                        sec.fragments.push(sec_frag);
+                    }
+                }
+            }
+        }
+
+        // iterate each sym
+        // TODO: write a iterator over every symbol
+        self.for_each_sym(|sym, elf, sec_info| {
+            let sec_idx = {
+                match elf.index() {
+                    SectionIndex::ABS | SectionIndex::COMMON | SectionIndex::UNDEF => {
+                        return;
+                    }
+                    SectionIndex::Other(a) => a,
+                    _ => {
+                        panic!("unsupported Section Index");
+                    }
+                }
+            };
+            if let Some(ref sec) = sec_info.mergeable_sections[sec_idx as usize] {
+                ///////////////////// DEBUG //////////////////////////
+                // let sec_header = &sec_info.sections[sec_idx as usize];
+                // if let Some(ref sec_header) = sec_header {
+                //     println!(
+                //         "handling sec {}, elf.val {}, sec_data {:?}",
+                //         sec_header.name, elf.val, sec_header.data
+                //     );
+                // }
+                ///////////////////// DEBUG //////////////////////////
+                let frag = sec.get_fragment(elf.val as usize);
+                sym.set_frag(frag);
+            }
+        });
+    }
+
+    fn for_each_sym<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut Symbol, &ElfSymbol, &SectionInfo),
+    {
+        if let Some(symbol_info) = &mut self.symbol_info {
+            for i in 0..symbol_info.first_global {
+                let elf = &symbol_info.elf_symbols[i];
+                let sym = &mut symbol_info.local_symbols[i];
+                f(sym, elf, &self.section_info);
+            }
+            for i in symbol_info.first_global..symbol_info.elf_symbols.len() {
+                let ind = i - symbol_info.first_global;
+                let elf = &symbol_info.elf_symbols[ind];
+                let sym = symbol_info.global_symbols[ind].clone();
+                let mut sym_guard = sym.lock().unwrap();
+                f(&mut sym_guard, elf, &self.section_info);
+            }
+        }
     }
 
     pub fn initialize_symbol(&mut self, ctx: &mut Context) {

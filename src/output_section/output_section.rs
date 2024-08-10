@@ -6,11 +6,16 @@ use crate::{
     Id,
 };
 
+use super::merged_section::MergedSection;
+
 pub type ShareOutputSection = Rc<Mutex<dyn OutputSection>>;
 
 pub trait OutputSection {
-    fn is_mergable(&self) -> bool {
+    fn is_mergeable(&self) -> bool {
         false
+    }
+    fn to_mergeable(&mut self) -> Option<&mut MergedSection> {
+        None
     }
     fn section_header(&self) -> &SectionHeader;
 
@@ -23,6 +28,7 @@ pub trait OutputSection {
     }
 }
 
+#[derive(Debug)]
 pub struct SectionWrapper {
     pub name: String,
     pub id: Id,

@@ -178,6 +178,9 @@ impl ElfSymbol {
     pub fn is_common(&self) -> bool {
         self.index() == SectionIndex::COMMON
     }
+    pub fn is_undef(&self) -> bool {
+        self.index() == SectionIndex::UNDEF
+    }
 }
 
 impl From<u16> for SectionIndex {

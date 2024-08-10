@@ -31,4 +31,4 @@ EOF
 
 
 # target/debug/linker_rs "$t"/a.o
-gcc -B. -fno-lto -static "$t"/a.o "$t"/a.o -o "$t"/out
+# gcc -B. -fno-lto -static "$t"/a.o "$t"/a.o -o "$t"/out

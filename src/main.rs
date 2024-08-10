@@ -8,12 +8,13 @@ mod passes;
 mod section;
 mod symbol;
 mod utils;
-use std::{fs::File, rc::Rc, sync::Mutex};
+use std::{fs::File, rc::Rc, str::from_utf8, sync::Mutex};
 
 use argument_parser::Args;
 use clap::Parser;
 use context::Context;
 use linker::SectionFlag;
+use section::Section;
 use utils::input_elf::InputElf;
 
 pub type Id = Rc<Mutex<usize>>;
@@ -64,7 +65,36 @@ fn main() {
             }
             for ind in merge_sec_ind {
                 if let Some(sec) = &elf.section_info.sections[ind] {
-                    println!("({})[{}] {:?}", elf.name, sec.name, sec.data);
+                    let sec_header = &elf.section_info.elf_sections[ind];
+                    if sec_header.flags & SectionFlag::STRINGS as u64 != 0 {
+                        let mut s_data: Vec<u8> = vec![];
+                        let mut strings = vec![];
+                        let size = sec_header.ent_size as usize;
+                        for chunk in sec.data.chunks(size) {
+                            if chunk.iter().all(|&x| x == 0) {
+                                // FIXME: need to handle empty string
+                                if s_data.len() != 0 {
+                                    let s = {
+                                        // FIXME: how to handle utf8
+                                        if let Ok(s) = from_utf8(&s_data) {
+                                            s.to_string()
+                                        } else {
+                                            let s: String =
+                                                s_data.iter().map(|&c| c as char).collect();
+                                            s
+                                        }
+                                    };
+                                    strings.push(s);
+                                    s_data.clear();
+                                }
+                            } else {
+                                s_data.extend(chunk);
+                            }
+                        }
+
+                        // println!("({})[{}] {:?}", elf.name, sec.name, strings);
+                        println!("({})[{}] {:?}", size, sec.name, strings);
+                    }
                 }
             }
             // if let Some(info) = &elf.symbol_info {
